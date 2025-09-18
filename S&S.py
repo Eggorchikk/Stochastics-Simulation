@@ -4,47 +4,132 @@ from scipy import stats
 import matplotlib.pyplot as plt
 import seaborn as sns 
 
-
+#extracting data
 data = pd.read_excel("data_assignment.xlsx")
+
+#added columns for date/time/week/month
 data['Date_Day'] = data['Date'].dt.date
 data['Date_Time'] = data['Date'].dt.time
 data['Week'] = data['Date'].dt.to_period('W').astype(str)
 data['Month'] = data['Date'].dt.to_period('M').astype(str)
+
+#added masks for income/expense
 mask_income = data['Income/Expense'] == 'Income'
 mask_expense = data['Income/Expense'] == 'Expense'
+
+#data for income/expense
 income_amount_df = data[mask_income]
 expense_amount_df = data[mask_expense]
+
 income_amount = income_amount_df['Amount']
 expense_amount = expense_amount_df['Amount']
-print(income_amount_df.describe())
 
-grouped_category_in_df = income_amount_df.groupby('Category')
-
-pivot_data = expense_amount_df.pivot_table(
+#
+#Creating pivot/heatmap df for income/expense
+#
+expense_pivot_data = expense_amount_df.pivot_table(
     index='Week',
     columns='Category',
     values='Amount',
     aggfunc='sum',
     fill_value=0
 )
+#renaming index to week#No
+expense_pivot_data.index = [f"W{i+1}" for i in range(len(expense_pivot_data.index))]
 
-heatmap_data = expense_amount_df.pivot_table(
+expense_heatmap_data = expense_amount_df.pivot_table(
     index='Category',
     columns='Week',
     values='Amount',
     aggfunc='sum',
     fill_value=0
 )
+#renaming columns to week#No
+expense_heatmap_data.columns = [f"W{i+1}" for i in range(len(expense_heatmap_data.columns))]
 
-# plt.figure()
-# sns.barplot(data = expense_amount_df, x = 'Category', y = 'Amount', ci=None)
+income_heatmap_data = income_amount_df.pivot_table(
+    index='Category',
+    columns='Week',
+    values='Amount',
+    aggfunc='sum',
+    fill_value=0
+)
+income_heatmap_data.columns = [f"W{i+1}" for i in range(len(income_heatmap_data.columns))]
 
-# print(heatmap_data.head())
-# plt.figure()
-# sns.heatmap(data=heatmap_data, cmap='YlGnBu')
 
-# plt.figure()
-# pivot_data.plot(kind="bar", stacked=True)
+income_pivot_data = income_amount_df.pivot_table(
+    index='Week',
+    columns='Category',
+    values='Amount',
+    aggfunc='sum',
+    fill_value=0
+)
+income_pivot_data.index = [f"W{i+1}" for i in range(len(income_pivot_data.index))]
+
+
+#sort expenses/income by sum and ascending
+expense_totals = expense_amount_df.groupby('Category')['Amount'].sum().sort_values(ascending=True)
+income_totals = income_amount_df.groupby('Category')['Amount'].sum().sort_values(ascending=True)
+
+"""fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+# INCOME/EXPENSE BARPLOT
+income_totals.plot(kind='bar', ax=ax1, color='green')
+ax1.set_title("Income by Category")
+ax1.set_xlabel("Category")
+ax1.set_ylabel("Amount")
+ax1.tick_params(axis='x', rotation=45)
+
+expense_totals.plot(kind='bar', ax=ax2, color='red')
+ax2.set_title("Expenses by Category")
+ax2.set_xlabel("Category")
+ax2.tick_params(axis='x', rotation=45)
+
+plt.tight_layout()
+plt.show()
+"""
+
+
+"""fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+#INCOME/EXPENSE HEATMAP
+sns.heatmap(data=expense_heatmap_data, cmap='viridis', ax=ax1)
+ax1.set_title("Weekly Expenses by Category")
+ax1.tick_params(axis='x', rotation=45)
+
+sns.heatmap(data=income_heatmap_data, cmap='viridis', ax=ax2)
+ax2.set_title("Weekly income by Category")
+ax2.tick_params(axis='x', rotation=45)
+ax2.tick_params(axis='y', rotation=0)
+
+for ax in (ax1, ax2):
+    ax.set_ylabel(None)
+    ax.set_xlabel("Week")
+fig.supylabel("Category")    
+
+plt.tight_layout()
+plt.show()"""
+
+
+"""fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+#INCOME/EXPENSE STACKBARPLOT
+expense_pivot_data.plot(kind="bar", stacked=True, width=0.9, ax=ax1)
+
+ax1.set_title("Weekly Expenses by Category")
+ax1.set_xlabel("Week")
+ax1.set_ylabel("Amount")
+ax1.tick_params(axis='x', rotation=45)
+
+income_pivot_data.plot(kind="bar", stacked=True, width=0.9, ax=ax2)
+ax2.set_title("Weekly income by Category")
+ax2.set_xlabel("Week")
+ax2.set_ylabel("Amount")
+ax2.tick_params(axis='x', rotation=45)
+# move legend out of the way
+ax1.legend(title='Category', bbox_to_anchor=(1.05, 1), loc='upper left')
+ax2.legend(title='Category', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+plt.tight_layout()
+plt.show()"""
+
 
 # plt.figure()
 # sns.histplot(expense_amount, bins=30)
