@@ -6,7 +6,8 @@ import seaborn as sns
 
 #extracting data
 data = pd.read_excel("data_assignment.xlsx")
-
+data = data.sort_values(['Category', 'Date'])
+data['Interarrival_Time'] = data.groupby('Category')['Date'].diff().dt.total_seconds()
 #added columns for date/time/week/month
 data['Date_Day'] = data['Date'].dt.date
 data['Date_Time'] = data['Date'].dt.time
@@ -130,9 +131,30 @@ ax2.legend(title='Category', bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.tight_layout()
 plt.show()"""
 
+other_income_amount_df = income_amount_df[income_amount_df['Category'] == 'Other']['Amount']
+food_expense_amount_df = expense_amount_df[expense_amount_df['Category'] == 'Food']['Amount']
+""" #HISTOGRAM OF OTHER INCOME
+plt.hist(other_income_df, bins=30, density=True)
+plt.title('Income Distribution for Other Category')
+plt.xlabel('Amount (€)')
+plt.ylabel('Frequency')
+plt.show()"""
+""" #HISTOGRAM OF FOOD EXPENSE
+plt.hist(food_expense_df, bins=30, density=True)
+plt.title('Expense Distribution for Food Category')
+plt.xlabel('Amount (€)')
+plt.ylabel('Frequency')
+plt.show()"""
+food_expense_df = expense_amount_df[expense_amount_df['Category'] == 'Food']
+inter_days = food_expense_df['Interarrival_Time'].dropna()/86400
 
-# plt.figure()
-# sns.histplot(expense_amount, bins=30)
+""" #HISTOGRAM INTERARRIVAL TIMES FOOD EXPENSE
+sns.histplot(inter_days, bins=20, stat='density', color='skyblue')
+plt.xlabel('Interarrival time (seconds)')
+plt.ylabel('Density')
+plt.title('Interarrival Time Distribution – Food Expenses')
+plt.show()"""
+
 
 income_M1 = np.mean(income_amount)
 income_M2 = np.mean(income_amount**2)
