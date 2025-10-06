@@ -131,21 +131,21 @@ plt.tight_layout()
 plt.show()"""
 
 
-# plt.figure()
-# sns.histplot(expense_amount, bins=30)
+# INCOME AMOUNT DISTRIBUTIONS
+plt.figure()
+sns.histplot(income_amount, bins=30)
 
 income_M1 = np.mean(income_amount)
 income_M2 = np.mean(income_amount**2)
 
-# normal distribution
-mu = income_M1
-sigma2 = income_M2 - income_M1**2
-fitNormDist = stats.norm(mu, np.sqrt(sigma2))
+income_mu = income_M1
+income_sigma2 = income_M2 - income_M1**2
 
-# Ass theoretical density???
+# fit an exponential distribution
+lam = 1/income_M1
+fitExpDist = stats.expon(scale=1/lam)
 xs = np.arange(np.min(income_amount), np.max(income_amount), 0.1)
-ys = fitNormDist.pdf(xs)
-
+ys = fitExpDist.pdf(xs)
 plt.figure()
 plt.hist(income_amount, bins=10, rwidth=0.8, density=True)
 plt.plot(xs, ys, color='red')
@@ -154,9 +154,82 @@ plt.plot(xs, ys, color='red')
 ecdfx = np.sort(income_amount)
 ecdfy = np.arange(1, len(income_amount)+1) / len(income_amount)
 plt.figure()
-plt.step(ecdfx, ecdfy, where='post')
-plt.plot(xs, fitNormDist.cdf(xs), color='black')
+plt.step(ecdfx, ecdfy, where='post', color='g')
+plt.plot(xs, fitExpDist.cdf(xs), color='orange')
+
+# Kolmogorov-Smirnov test
+tst1 = stats.kstest(income_amount, fitExpDist.cdf)
+print('KS Test Gamma distribution: ' + str(tst1))
+
+# fit a gamma distribution
+alpha = income_M1**2 / (income_M2 - income_M1**2)
+beta = income_M1 / (income_M2 - income_M1**2)
+fitGammaDist = stats.gamma(alpha, scale=1/beta)
+ys = fitGammaDist.pdf(xs)
+plt.plot(xs, fitGammaDist.cdf(xs), color='r')
+# Kolmogorov-Smirnov test
+tst1 = stats.kstest(income_amount, fitGammaDist.cdf)
+print('KS Test Exponential distribution: ' + str(tst1))
+
+# fit a negative binaomial distribution
+p = income_mu / income_sigma2
+r = income_mu**2 / (income_sigma2 - income_mu)
+fitNBDist = stats.nbinom(n=r, p=p)
+xs = np.arange(0, max(income_amount)+5)
+plt.plot(xs, fitNBDist.cdf(xs), 'b--', label='NB CDF')
+# Kolmogorov-Smirnov test (use CDF directly)
+ks_result = stats.kstest(income_amount, fitNBDist.cdf)
+print('KS Test Negative Binomial distribution:', ks_result)
 
 
+# EXPENSE AMOUNT DISTRIBUTIONS
+plt.figure()
+sns.histplot(expense_amount, bins=30)
+
+expense_M1 = np.mean(expense_amount)
+expense_M2 = np.mean(expense_amount**2)
+
+expense_mu = expense_M1
+expense_sigma2 = expense_M2 - expense_M1**2
+
+# fit an exponential distribution
+lam = 1/expense_M1
+fitExpDist = stats.expon(scale=1/lam)
+xs = np.arange(np.min(expense_amount), np.max(expense_amount), 0.1)
+ys = fitExpDist.pdf(xs)
+plt.figure()
+plt.hist(expense_amount, bins=30, rwidth=0.8, density=True)
+plt.plot(xs, ys, color='red')
+
+# ecdf
+ecdfx = np.sort(expense_amount)
+ecdfy = np.arange(1, len(expense_amount)+1) / len(expense_amount)
+plt.figure()
+plt.step(ecdfx, ecdfy, where='post', color='g')
+plt.plot(xs, fitExpDist.cdf(xs), color='orange')
+
+# Kolmogorov-Smirnov test
+tst1 = stats.kstest(expense_amount, fitExpDist.cdf)
+print('KS Test Gamma distribution: ' + str(tst1))
+
+# fit a gamma distribution
+alpha = expense_M1**2 / (expense_M2 - expense_M1**2)
+beta = expense_M1 / (expense_M2 - expense_M1**2)
+fitGammaDist = stats.gamma(alpha, scale=1/beta)
+ys = fitGammaDist.pdf(xs)
+plt.plot(xs, fitGammaDist.cdf(xs), color='r')
+# Kolmogorov-Smirnov test
+tst1 = stats.kstest(expense_amount, fitGammaDist.cdf)
+print('KS Test Exponential distribution: ' + str(tst1))
+
+# fit a negative binaomial distribution
+p = expense_mu / expense_sigma2
+r = expense_mu**2 / (expense_sigma2 - expense_mu)
+fitNBDist = stats.nbinom(n=r, p=p)
+xs = np.arange(0, max(expense_amount)+5)
+plt.plot(xs, fitNBDist.cdf(xs), 'b--', label='NB CDF')
+# Kolmogorov-Smirnov test (use CDF directly)
+ks_result = stats.kstest(expense_amount, fitNBDist.cdf)
+print('KS Test Negative Binomial distribution:', ks_result)
 
 plt.show()
