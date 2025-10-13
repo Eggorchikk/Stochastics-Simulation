@@ -6,7 +6,13 @@ import seaborn as sns
 
 #extracting data
 data = pd.read_excel("data_assignment.xlsx")
+# data cleaning
+data = data.dropna()
+data = data[data["Amount"] >= 0]
+data = data.drop_duplicates()
+# data sorting
 data = data.sort_values(['Category', 'Date'])
+# data grouping
 data['Interarrival_Time'] = data.groupby('Category')['Date'].diff().dt.total_seconds()
 #added columns for date/time/week/month
 data['Date_Day'] = data['Date'].dt.date
@@ -75,28 +81,98 @@ income_totals = income_amount_df.groupby('Category')['Amount'].sum().sort_values
 print(income_amount_df.groupby('Category')['Amount'].describe())
 print(expense_amount_df.groupby('Category')['Amount'].describe())
 
-"""fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+# Box plots
+# grouping categories with small number of measurements
+category_counts = expense_amount_df['Category'].value_counts()
+small_categories = category_counts[category_counts < 5].index
+expense_amount_df['Category_grouped'] = expense_amount_df['Category'].apply(lambda x: 'Other' if x in small_categories else x)
+
+plt.figure(figsize=(10, 6))
+sns.boxplot(y='Category_grouped', x='Amount', data=expense_amount_df)
+plt.xscale('log')
+plt.xlabel('Amount (log scale)')
+plt.title('Expenses by Category (Log Scale) with Small Groups Combined')
+plt.tight_layout()
+
+plt.figure()
+sns.boxplot(x=income_amount_df['Amount'])
+plt.title('Income Distribution by Category')
+plt.xticks(rotation=45)
+plt.tight_layout()
+
+# Weekly total income
+weekly_income = income_amount_df.groupby('Week')['Amount'].sum().reset_index()
+weekly_expense = expense_amount_df.groupby('Week')['Amount'].sum().reset_index()
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 7), sharey=True)
+sns.boxplot(y='Amount', data=weekly_income, ax=ax1, color='skyblue')
+plt.suptitle('Weekly Total Income/Expense')
+ax1.set_ylabel('Amount')
+ax1.set_xlabel("Income")
+sns.boxplot(y='Amount', data=weekly_expense, ax=ax2, color='skyblue')
+ax2.set_xlabel("Expense")
+plt.xticks(rotation=45)
+plt.tight_layout()
+
+
 # INCOME/EXPENSE BARPLOT
-income_totals.plot(kind='bar', ax=ax1, color='green')
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+income_totals.plot(kind='bar', ax=ax1, color='royalblue')
 ax1.set_title("Income by Category")
 ax1.set_xlabel("Category")
 ax1.set_ylabel("Amount")
 ax1.tick_params(axis='x', rotation=45)
 
-expense_totals.plot(kind='bar', ax=ax2, color='red')
+expense_totals.plot(kind='bar', ax=ax2, color='orange')
 ax2.set_title("Expenses by Category")
 ax2.set_xlabel("Category")
 ax2.tick_params(axis='x', rotation=45)
-
 plt.tight_layout()
-plt.show()
-"""
 
-# sns.boxplot(data=income_amount_df, x='Category', y='Amount')
-# sns.boxplot(data=expense_amount_df, x='Category', y='Amount')
+# Weekly analysis
+expense_amount_df = expense_amount_df.copy()
+# Add weekday
+expense_amount_df['Weekday'] = expense_amount_df['Date'].dt.day_name()
+# Total expense per day
+daily_expense = expense_amount_df.groupby(['Date_Day', 'Weekday'])['Amount'].sum().reset_index()
+# Average daily expense per weekday
+avg_daily_expense = daily_expense.groupby('Weekday')['Amount'].mean()
+# Define weekday order
+weekday_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+avg_daily_expense = avg_daily_expense.reindex(weekday_order)
 
-"""fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+# Plot bar chart
+plt.figure(figsize=(8,5))
+sns.barplot(x=avg_daily_expense.index, y=avg_daily_expense.values, palette='viridis')
+
+plt.title('Average Daily Expense per Weekday')
+plt.ylabel('Average Expense')
+plt.xlabel('Weekday')
+plt.xticks(rotation=45)
+plt.tight_layout()
+
+
+# Total expense per day, per weekday, per category
+daily_expense_cat = expense_amount_df.groupby(['Date_Day', 'Weekday', 'Category'])['Amount'].sum().reset_index()
+# Average daily expense per weekday and category
+avg_daily_expense_cat = daily_expense_cat.groupby(['Weekday', 'Category'])['Amount'].mean().reset_index()
+# Pivot for stacked bar plot
+avg_daily_expense_pivot = avg_daily_expense_cat.pivot(index='Weekday', columns='Category', values='Amount')
+# Reorder by weekdays
+avg_daily_expense_pivot = avg_daily_expense_pivot.reindex(weekday_order)
+# Plot
+avg_daily_expense_pivot.plot(kind='bar', stacked=True, figsize=(10,6), colormap='tab20')
+
+plt.title('Average Daily Expense per Weekday by Category (Stacked)')
+plt.ylabel('Average Expense')
+plt.xlabel('Weekday')
+plt.xticks(rotation=45)
+plt.legend(title='Category', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.tight_layout()
+
+
 #INCOME/EXPENSE HEATMAP
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
 sns.heatmap(data=expense_heatmap_data, cmap='viridis', ax=ax1)
 ax1.set_title("Weekly Expenses by Category")
 ax1.tick_params(axis='x', rotation=45)
@@ -112,19 +188,18 @@ for ax in (ax1, ax2):
 fig.supylabel("Category")    
 
 plt.tight_layout()
-plt.show()"""
 
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
 #INCOME/EXPENSE STACKBARPLOT
-expense_pivot_data.plot(kind="bar", stacked=True, width=0.9, ax=ax1)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+expense_pivot_data.plot(kind="bar", stacked=True, width=0.9, ax=ax1, colormap='tab10')
 
 ax1.set_title("Weekly Expenses by Category")
 ax1.set_xlabel("Week")
 ax1.set_ylabel("Amount")
 ax1.tick_params(axis='x', rotation=45)
 
-income_pivot_data.plot(kind="bar", stacked=True, width=0.9, ax=ax2)
+income_pivot_data.plot(kind="bar", stacked=True, width=0.9, ax=ax2, colormap='tab10')
 ax2.set_title("Weekly income by Category")
 ax2.set_xlabel("Week")
 ax2.set_ylabel("Amount")
@@ -135,9 +210,6 @@ ax2.legend(title='Category', bbox_to_anchor=(1.05, 1), loc='upper left')
 
 plt.tight_layout()
 plt.show()
-
-
-
 
 
 
@@ -177,253 +249,362 @@ plt.ylabel('Density')
 plt.title('Interarrival Time Distribution – Food Expenses')
 plt.show()
 
-# # INCOME AMOUNT DISTRIBUTIONS
-# plt.figure()
-# sns.histplot(income_amount, bins=30)
 
-# income_M1 = np.mean(income_amount)
-# income_M2 = np.mean(income_amount**2)
+# INCOME AMOUNT DISTRIBUTIONS
+plt.figure()
+sns.histplot(income_amount, bins=30)
+plt.title('Income Amount Distribution') 
+plt.xlabel('Income Amount')              
+plt.ylabel('Frequency')                 
 
-# income_mu = income_M1
-# income_sigma2 = income_M2 - income_M1**2
+income_M1 = np.mean(income_amount)
+income_M2 = np.mean(income_amount**2)
 
-# # fit an exponential distribution
-# lam = 1/income_M1
-# fitExpDist = stats.expon(scale=1/lam)
-# xs = np.arange(np.min(income_amount), np.max(income_amount), 0.1)
-# ys = fitExpDist.pdf(xs)
-# plt.figure()
-# plt.hist(income_amount, bins=10, rwidth=0.8, density=True)
-# plt.plot(xs, ys, color='red')
+income_mu = income_M1
+income_sigma2 = income_M2 - income_M1**2
 
-# # ecdf
-# ecdfx = np.sort(income_amount)
-# ecdfy = np.arange(1, len(income_amount)+1) / len(income_amount)
-# plt.figure()
-# plt.step(ecdfx, ecdfy, where='post', color='g')
-# plt.plot(xs, fitExpDist.cdf(xs), color='orange')
+# fit an exponential distribution
+lam = 1/income_M1
+fitExpDist = stats.expon(scale=1/lam)
+xs = np.arange(np.min(income_amount), np.max(income_amount), 0.1)
+ys = fitExpDist.pdf(xs)
+plt.figure()
+plt.hist(income_amount, bins=10, rwidth=0.8, density=True, alpha=0.6, label='Income Histogram')  # Added alpha and label
+plt.plot(xs, ys, color='red', lw=2, label='Exponential PDF')  # Added line width and label
+plt.title('Income Amount with Exponential Fit')  # Added title
+plt.xlabel('Income Amount')  # Added x-axis label
+plt.ylabel('Density')        # Added y-axis label
+plt.legend()                 # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# # Kolmogorov-Smirnov test
-# tst1 = stats.kstest(income_amount, fitExpDist.cdf)
-# print('KS Test Gamma distribution: ' + str(tst1))
+# ecdf
+ecdfx = np.sort(income_amount)
+ecdfy = np.arange(1, len(income_amount)+1) / len(income_amount)
+plt.figure()
+plt.step(ecdfx, ecdfy, where='post', color='g', label='Empirical CDF')  # Added label
+plt.plot(xs, fitExpDist.cdf(xs), color='orange', lw=2, label='Exponential CDF')  # Added line width and label
+plt.title('Income Amount ECDF and Exponential CDF')  # Added title
+plt.xlabel('Income Amount')  # Added x-axis label
+plt.ylabel('CDF')            # Added y-axis label
+plt.legend()                 # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# # fit a gamma distribution
-# alpha = income_M1**2 / (income_M2 - income_M1**2)
-# beta = income_M1 / (income_M2 - income_M1**2)
-# fitGammaDist = stats.gamma(alpha, scale=1/beta)
-# ys = fitGammaDist.pdf(xs)
-# plt.plot(xs, fitGammaDist.cdf(xs), color='r')
-# # Kolmogorov-Smirnov test
-# tst1 = stats.kstest(income_amount, fitGammaDist.cdf)
-# print('KS Test Exponential distribution: ' + str(tst1))
+# Kolmogorov-Smirnov test
+tst1 = stats.kstest(income_amount, fitExpDist.cdf)
+print('KS Test Exponential distribution: ' + str(tst1))
 
-# # fit a negative binaomial distribution
-# p = income_mu / income_sigma2
-# r = income_mu**2 / (income_sigma2 - income_mu)
-# fitNBDist = stats.nbinom(n=r, p=p)
-# xs = np.arange(0, max(income_amount)+5)
-# plt.plot(xs, fitNBDist.cdf(xs), 'b--', label='NB CDF')
-# # Kolmogorov-Smirnov test (use CDF directly)
-# ks_result = stats.kstest(income_amount, fitNBDist.cdf)
-# print('KS Test Negative Binomial distribution:', ks_result)
+# fit a gamma distribution
+alpha = income_M1**2 / (income_M2 - income_M1**2)
+beta = income_M1 / (income_M2 - income_M1**2)
+fitGammaDist = stats.gamma(alpha, scale=1/beta)
+ys = fitGammaDist.pdf(xs)
+plt.plot(xs, fitGammaDist.cdf(xs), color='r', lw=2, label='Gamma CDF')  # Added line width and label
+plt.title('Income Amount ECDF and Gamma CDF')  # Added title (to existing figure)
+plt.xlabel('Income Amount')  # Added x-axis label
+plt.ylabel('CDF')            # Added y-axis label
+plt.legend()                 # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
+# Kolmogorov-Smirnov test
+tst1 = stats.kstest(income_amount, fitGammaDist.cdf)
+print('KS Test Gamma distribution: ' + str(tst1))
 
-# # EXPENSE AMOUNT DISTRIBUTIONS
-# plt.figure()
-# sns.histplot(expense_amount, bins=30)
+# fit a negative binaomial distribution
+p = income_mu / income_sigma2
+r = income_mu**2 / (income_sigma2 - income_mu)
+fitNBDist = stats.nbinom(n=r, p=p)
+xs = np.arange(0, max(income_amount)+5)
+plt.plot(xs, fitNBDist.cdf(xs), 'b--', label='NB CDF', lw=2)  # Added label and line width
+plt.title('Income Amount ECDF and Negative Binomial CDF')  # Added title
+plt.xlabel('Income Amount')  # Added x-axis label
+plt.ylabel('CDF')            # Added y-axis label
+plt.legend()                 # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# expense_M1 = np.mean(expense_amount)
-# expense_M2 = np.mean(expense_amount**2)
-
-# expense_mu = expense_M1
-# expense_sigma2 = expense_M2 - expense_M1**2
-
-# # fit an exponential distribution
-# lam = 1/expense_M1
-# fitExpDist = stats.expon(scale=1/lam)
-# xs = np.arange(np.min(expense_amount), np.max(expense_amount), 0.1)
-# ys = fitExpDist.pdf(xs)
-# plt.figure()
-# plt.hist(expense_amount, bins=30, rwidth=0.8, density=True)
-# plt.plot(xs, ys, color='red')
-
-# # ecdf
-# ecdfx = np.sort(expense_amount)
-# ecdfy = np.arange(1, len(expense_amount)+1) / len(expense_amount)
-# plt.figure()
-# plt.step(ecdfx, ecdfy, where='post', color='g')
-# plt.plot(xs, fitExpDist.cdf(xs), color='orange')
-
-# # Kolmogorov-Smirnov test
-# tst1 = stats.kstest(expense_amount, fitExpDist.cdf)
-# print('KS Test Gamma distribution: ' + str(tst1))
-
-# # fit a gamma distribution
-# alpha = expense_M1**2 / (expense_M2 - expense_M1**2)
-# beta = expense_M1 / (expense_M2 - expense_M1**2)
-# fitGammaDist = stats.gamma(alpha, scale=1/beta)
-# ys = fitGammaDist.pdf(xs)
-# plt.plot(xs, fitGammaDist.cdf(xs), color='r')
-# # Kolmogorov-Smirnov test
-# tst1 = stats.kstest(expense_amount, fitGammaDist.cdf)
-# print('KS Test Exponential distribution: ' + str(tst1))
-
-# # fit a negative binaomial distribution
-# p = expense_mu / expense_sigma2
-# r = expense_mu**2 / (expense_sigma2 - expense_mu)
-# fitNBDist = stats.nbinom(n=r, p=p)
-# xs = np.arange(0, max(expense_amount)+5)
-# plt.plot(xs, fitNBDist.cdf(xs), 'b--', label='NB CDF')
-# # Kolmogorov-Smirnov test (use CDF directly)
-# ks_result = stats.kstest(expense_amount, fitNBDist.cdf)
-# print('KS Test Negative Binomial distribution:', ks_result)
+# Kolmogorov-Smirnov test (use CDF directly)
+ks_result = stats.kstest(income_amount, fitNBDist.cdf)
+print('KS Test Negative Binomial distribution:', ks_result)
 
 
-# def simulateCompoundPoissonProcess(lam, amount_dist, T):
-#     arrival_times = []
-#     t = 0
-#     while t < T:
-#         t += stats.expon(scale=1/lam).rvs()
-#         if t < T:
-#             arrival_times.append(t)
-#     amounts = amount_dist.rvs(size=len(arrival_times))
-#     cumulative = np.cumsum(amounts)
-#     return np.array(arrival_times), amounts, cumulative
+# EXPENSE AMOUNT DISTRIBUTIONS
+plt.figure()
+sns.histplot(expense_amount, bins=30)
+plt.title('Expense Amount Distribution') 
+plt.xlabel('Expense Amount')              
+plt.ylabel('Frequency')                   
 
-# T = 100 
-# lam_income = 3
-# lam_expense = 5
 
-# # INCOME: Exponential distribution
-# income_mean = 30
-# income_dist = stats.expon(scale=income_mean)
+expense_M1 = np.mean(expense_amount)
+expense_M2 = np.mean(expense_amount**2)
 
-# # EXPENSE OPTION 1: Exponential
-# expense_mean = 20
-# expense_dist_exp = stats.expon(scale=expense_mean)
+expense_mu = expense_M1
+expense_sigma2 = expense_M2 - expense_M1**2
 
-# # EXPENSE OPTION 2: Negative Binomial with mean=20, var=50
-# mu = 20
-# sigma2 = 50
-# p_nb = mu / sigma2
-# r_nb = mu**2 / (sigma2 - mu)    
-# expense_dist_nb = stats.nbinom(n=r_nb, p=p_nb)
+# fit an exponential distribution
+lam = 1/expense_M1
+fitExpDist = stats.expon(scale=1/lam)
+xs = np.arange(np.min(expense_amount), np.max(expense_amount), 0.1)
+ys = fitExpDist.pdf(xs)
+plt.figure()
+plt.hist(expense_amount, bins=30, rwidth=0.8, density=True, alpha=0.6, label='Expense Histogram')  # Added alpha and label
+plt.plot(xs, ys, color='red', lw=2, label='Exponential PDF')  # Added line width and label
+plt.title('Expense Amount with Exponential Fit')  # Added title
+plt.xlabel('Expense Amount')  # Added x-axis label
+plt.ylabel('Density')         # Added y-axis label
+plt.legend()                  # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# # === SIMULATE INCOME PROCESS ===
-# arr_income, amt_income, cum_income = simulateCompoundPoissonProcess(lam_income, income_dist, T)
+# ecdf
+ecdfx = np.sort(expense_amount)
+ecdfy = np.arange(1, len(expense_amount)+1) / len(expense_amount)
+plt.figure()
+plt.step(ecdfx, ecdfy, where='post', color='g', label='Empirical CDF')  # Added label
+plt.plot(xs, fitExpDist.cdf(xs), color='orange', lw=2, label='Exponential CDF')  # Added line width and label
+plt.title('Expense Amount ECDF and Exponential CDF')  # Added title
+plt.xlabel('Expense Amount')  # Added x-axis label
+plt.ylabel('CDF')              # Added y-axis label
+plt.legend()                   # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# # === SIMULATE EXPENSE PROCESS (choose one) ===
-# # expense_dist = expense_dist_exp  # uncomment for exponential
-# expense_dist = expense_dist_nb     # uncomment for negative binomial
-# arr_expense, amt_expense, cum_expense = simulateCompoundPoissonProcess(lam_expense, expense_dist, T)
+# Kolmogorov-Smirnov test
+tst1 = stats.kstest(expense_amount, fitExpDist.cdf)
+print('KS Test Exponential distribution: ' + str(tst1))
 
-# # === NET BALANCE ===
-# all_times = np.sort(np.unique(np.concatenate([arr_income, arr_expense, [T]])))
-# income_at_times = np.interp(all_times, np.append(arr_income, T), np.append(cum_income, cum_income[-1] if len(cum_income) else 0))
-# expense_at_times = np.interp(all_times, np.append(arr_expense, T), np.append(cum_expense, cum_expense[-1] if len(cum_expense) else 0))
-# net_balance = income_at_times - expense_at_times
+# fit a gamma distribution
+alpha = expense_M1**2 / (expense_M2 - expense_M1**2)
+beta = expense_M1 / (expense_M2 - expense_M1**2)
+fitGammaDist = stats.gamma(alpha, scale=1/beta)
+ys = fitGammaDist.pdf(xs)
+plt.plot(xs, fitGammaDist.cdf(xs), color='r', lw=2, label='Gamma CDF')  # Added line width and label
+plt.title('Expense Amount ECDF and Gamma CDF')  # Added title (to existing figure)
+plt.xlabel('Expense Amount')  # Added x-axis label
+plt.ylabel('CDF')              # Added y-axis label
+plt.legend()                   # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# # === PLOTS ===
-# plt.figure(figsize=(10, 6))
-# plt.step(arr_income, cum_income, label="Cumulative Income", where='post', color='green')
-# plt.step(arr_expense, cum_expense, label="Cumulative Expenses", where='post', color='red')
-# plt.step(all_times, net_balance, label="Net Balance", where='post', color='blue')
-# plt.xlabel("Time")
-# plt.ylabel("Amount (€)")
-# plt.title("Compound Poisson Process – Incomes vs Expenses")
-# plt.legend()
-# plt.grid(True)
-# plt.tight_layout()
+# Kolmogorov-Smirnov test
+tst1 = stats.kstest(expense_amount, fitGammaDist.cdf)
+print('KS Test Gamma distribution: ' + str(tst1))
 
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from scipy import stats
+# fit a negative binaomial distribution
+p = expense_mu / expense_sigma2
+r = expense_mu**2 / (expense_sigma2 - expense_mu)
+fitNBDist = stats.nbinom(n=r, p=p)
+xs = np.arange(0, max(expense_amount)+5)
+plt.plot(xs, fitNBDist.cdf(xs), 'b--', label='NB CDF', lw=2)  # Added label and line width
+plt.title('Expense Amount ECDF and Negative Binomial CDF')  # Added title
+plt.xlabel('Expense Amount')  # Added x-axis label
+plt.ylabel('CDF')              # Added y-axis label
+plt.legend()                  # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# # --- Fixed Budget Goal Simulation ---
-# def simulate_until_goal(income_lam, income_scale, expense_lam, expense_dist, goal):
-#     t = 0
-#     savings = 0
-#     times = [0]
-#     savings_list = [0]
+# Kolmogorov-Smirnov test (use CDF directly)
+ks_result = stats.kstest(expense_amount, fitNBDist.cdf)
+print('KS Test Negative Binomial distribution:', ks_result)
 
-#     while savings < goal:
-#         next_income_time = np.random.exponential(1 / income_lam)
-#         next_expense_time = np.random.exponential(1 / expense_lam)
 
-#         if next_income_time < next_expense_time:
-#             t += next_income_time
-#             amount = np.random.exponential(income_scale)
-#             savings += amount
-#         else:
-#             t += next_expense_time
-#             amount = expense_dist.rvs()
-#             savings -= amount
 
-#         times.append(t)
-#         savings_list.append(savings)
+# Simulation using compound Poisson process
+def simulateCompoundPoissonProcess(lam, amount_dist, T):
+    arrival_times = []
+    t = 0
+    while t < T:
+        t += stats.expon(scale=1/lam).rvs()
+        if t < T:
+            arrival_times.append(t)
+    amounts = amount_dist.rvs(size=len(arrival_times))
+    cumulative = np.cumsum(amounts)
+    return np.array(arrival_times), amounts, cumulative
 
-#     return times, savings_list
+T = 100 
 
-# # --- Seasonal Expenses Only Simulation ---
-# def seasonal_expense_rate(day):
-#     weekday = day % 7
-#     return 1.5 if weekday in [5, 6] else 0.5  # Higher rate on weekends
+income_data = data[data['Income/Expense'] == 'Income']
+income_data = income_data.sort_values(by='Date')
+income_data['Interarrival_Time'] = income_data['Date'].diff().dt.total_seconds() / 86400
+interarrival_times_income = income_data['Interarrival_Time'].dropna()
+# Compute mean interarrival time
+mean_interarrival_income = interarrival_times_income.mean()
+# Compute lambda (arrival rate)
+lam_income = 1 / mean_interarrival_income
 
-# def simulate_seasonal_expenses(T_days, base_expense_dist):
-#     t = 0
-#     savings = 0
-#     times = [0]
-#     savings_list = [0]
-    
-#     while t < T_days:
-#         day = int(t)
-#         lam = seasonal_expense_rate(day)
-#         t += np.random.exponential(1 / lam)
-#         if t >= T_days:
-#             break
-#         expense = base_expense_dist.rvs()
-#         savings -= expense
-#         times.append(t)
-#         savings_list.append(savings)
+expense_data = data[data['Income/Expense'] == 'Expense']
+expense_data = expense_data.sort_values(by='Date')
+expense_data['Interarrival_Time'] = expense_data['Date'].diff().dt.total_seconds() / 86400
+interarrival_times_expense = expense_data['Interarrival_Time'].dropna()
+# Compute mean interarrival time
+mean_interarrival_expense = interarrival_times_expense.mean()
+# Compute lambda (arrival rate)
+lam_expense = 1 / mean_interarrival_expense
 
-#     return times, savings_list
 
-# # --- Run Simulations ---
+# INCOME: Gamma distribution
+income_mean = income_amount.mean()
+income_var = income_amount.var()
+alpha_income = income_mean**2 / income_var
+beta_income = income_mean / income_var
+income_dist = stats.gamma(a=alpha_income, scale=1/beta_income)
+
+# Expense: Gamma distribution
+expense_mean = expense_amount.mean()
+expense_var = expense_amount.var()
+alpha_expense = expense_mean**2 / expense_var
+beta_expense = expense_mean / expense_var
+expense_dist = stats.gamma(a=alpha_expense, scale=1/beta_expense)
+
+
+# SIMULATE INCOME/EXPENSE PROCESSES
+arr_income, amt_income, cum_income = simulateCompoundPoissonProcess(lam_income, income_dist, T)
+arr_expense, amt_expense, cum_expense = simulateCompoundPoissonProcess(lam_expense, expense_dist, T)
+
+# NET BALANCE
+all_times = np.sort(np.unique(np.concatenate([arr_income, arr_expense, [T]])))
+income_at_times = np.interp(all_times, np.append(arr_income, T), np.append(cum_income, cum_income[-1] if len(cum_income) else 0))
+expense_at_times = np.interp(all_times, np.append(arr_expense, T), np.append(cum_expense, cum_expense[-1] if len(cum_expense) else 0))
+net_balance = income_at_times - expense_at_times
+
+# PLOTS
+plt.figure(figsize=(10, 6))
+plt.step(arr_income, cum_income, label="Cumulative Income", where='post', color='green')
+plt.step(arr_expense, cum_expense, label="Cumulative Expenses", where='post', color='red')
+plt.step(all_times, net_balance, label="Net Balance", where='post', color='blue')
+plt.xlabel("Time")
+plt.ylabel("Amount (€)")
+plt.title("Compound Poisson Process – Incomes vs Expenses")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+
+
+# Scenario functions
+
+def increase_transport_expenses(df, increase_pct=0.2):
+    df_scenario = df.copy()
+    mask = (df_scenario['Category'] == 'Transportation') & (df_scenario['Income/Expense'] == 'Expense')
+    df_scenario.loc[mask, 'Amount'] *= (1 + increase_pct)
+    return df_scenario
+
+def stop_other_income_for_one_month(df, month_str='2023-05'):
+    df_scenario = df.copy()
+    mask = (df_scenario['Category'] == 'Other') & (df_scenario['Income/Expense'] == 'Income') & (df_scenario['Date'].dt.to_period('M').astype(str) == month_str)
+    df_scenario.loc[mask, 'Amount'] = 0
+    return df_scenario
+
+def add_monthly_allowance(df, allowance=100):
+    df_scenario = df.copy()
+    months = df_scenario['Date'].dt.to_period('M').unique()
+    allowance_entries = []
+    for month in months:
+        # Add allowance on the 1st day of each month
+        allowance_entries.append({
+            'Date': month.to_timestamp(),
+            'Income/Expense': 'Income',
+            'Category': 'Allowance',
+            'Amount': allowance
+        })
+    allowance_df = pd.DataFrame(allowance_entries)
+    allowance_df['Date'] = pd.to_datetime(allowance_df['Date'])
+    # Append allowance rows
+    df_scenario = pd.concat([df_scenario, allowance_df], ignore_index=True)
+    return df_scenario
+
+
+# --- Prepare baseline data ---
+
+data['Date'] = pd.to_datetime(data['Date'])
+
+# Apply scenarios by creating scenario-specific dataframes
+data_expense_transport_inc = increase_transport_expenses(data)
+data_income_stop_other = stop_other_income_for_one_month(data)
+data_income_with_allowance = add_monthly_allowance(data)
+
+# Function to prepare inputs and simulate from a given dataframe
+def simulate_from_data(df, T):
+
+    # Simulate compound Poisson processes
+    arr_income, amt_income, cum_income = simulateCompoundPoissonProcess(lam_income, income_dist, T)
+    arr_expense, amt_expense, cum_expense = simulateCompoundPoissonProcess(lam_expense, expense_dist, T)
+
+    # Calculate net balance over time
+    all_times = np.sort(np.unique(np.concatenate([arr_income, arr_expense, [T]])))
+    income_at_times = np.interp(all_times, np.append(arr_income, T), np.append(cum_income, cum_income[-1] if len(cum_income) else 0))
+    expense_at_times = np.interp(all_times, np.append(arr_expense, T), np.append(cum_expense, cum_expense[-1] if len(cum_expense) else 0))
+    net_balance = income_at_times - expense_at_times
+
+    return all_times, cum_income, cum_expense, net_balance, arr_income, arr_expense
+
+# Run baseline simulation
+all_times_base, cum_income_base, cum_expense_base, net_balance_base, arr_income_base, arr_expense_base = simulate_from_data(data, T)
+# Run scenario 1: Increase transportation expenses by 20%
+all_times_s1, cum_income_s1, cum_expense_s1, net_balance_s1, arr_income_s1, arr_expense_s1 = simulate_from_data(data_expense_transport_inc, T)
+# Run scenario 2: Stop "Other" income for one month (May 2023)
+all_times_s2, cum_income_s2, cum_expense_s2, net_balance_s2, arr_income_s2, arr_expense_s2 = simulate_from_data(data_income_stop_other, T)
+# Run scenario 3: Add extra monthly allowance (€100)
+all_times_s3, cum_income_s3, cum_expense_s3, net_balance_s3, arr_income_s3, arr_expense_s3 = simulate_from_data(data_income_with_allowance, T)
+
+# Plot baseline and scenarios
+plt.figure(figsize=(12, 8))
+# Baseline
+plt.step(all_times_base, net_balance_base, label='Baseline Net Balance', where='post', color='blue')
+# Scenario 1
+plt.step(all_times_s1, net_balance_s1, label='Scenario 1: +20% Transport Expenses', where='post', color='red')
+# Scenario 2
+plt.step(all_times_s2, net_balance_s2, label='Scenario 2: Stop Other Income (May 2023)', where='post', color='orange')
+# Scenario 3
+plt.step(all_times_s3, net_balance_s3, label='Scenario 3: +€100 Monthly Allowance', where='post', color='green')
+
+plt.xlabel('Time')
+plt.ylabel('Net Balance (€)')
+plt.title('Net Balance Over Time: Baseline vs Scenarios')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+
+
+
+# Fixed Budget Goal Simulation
+def simulate_until_goal(lam_income, income_dist, lam_expense, expense_dist, goal):
+    t = 0
+    savings = 0
+    times = [0]
+    savings_list = [0]
+
+    while savings < goal:
+        next_income_time = np.random.exponential(1 / lam_income)
+        next_expense_time = np.random.exponential(1 / lam_expense)
+
+        if next_income_time < next_expense_time:
+            t += next_income_time
+            amount = income_dist.rvs()
+            savings += amount
+        else:
+            t += next_expense_time
+            amount = expense_dist.rvs()
+            savings -= amount
+
+        times.append(t)
+        savings_list.append(savings)
+
+    return times, savings_list
+
+# Parameters
 # np.random.seed(42)
+goal = 500
 
-# # Parameters
-# income_lambda = 0.8
-# income_scale = 20
-# expense_lambda = 1.2
-# nbinom_r = 2
-# nbinom_p = 0.4
-# expense_dist = stats.nbinom(n=nbinom_r, p=nbinom_p)
-# goal = 500
+# Simulate
+times_goal, savings_goal = simulate_until_goal(lam_income, income_dist, lam_expense, expense_dist, goal)
 
-# # Simulate fixed goal
-# times_goal, savings_goal = simulate_until_goal(income_lambda, income_scale, expense_lambda, expense_dist, goal)
+# Plot Results
+plt.figure(figsize=(10, 6))
 
-# # Simulate seasonal expenses
-# T_days = 60
-# base_expense_dist = stats.expon(scale=15)
-# times_seasonal, savings_seasonal = simulate_seasonal_expenses(T_days, base_expense_dist)
-
-# # --- Plot Results ---
-# fig, axs = plt.subplots(2, 1, figsize=(10, 8))
-
-# axs[0].plot(times_goal, savings_goal, label='Savings Over Time (Goal €500)')
-# axs[0].axhline(500, color='red', linestyle='--', label='Goal €500')
-# axs[0].set_title('Compound Poisson Process Until Goal Reached')
-# axs[0].set_xlabel('Time')
-# axs[0].set_ylabel('Savings (€)')
-# axs[0].legend()
-
-# axs[1].step(times_seasonal, savings_seasonal, where='post', color='orange')
-# axs[1].set_title('Seasonal Compound Poisson Process (Expenses Only)')
-# axs[1].set_xlabel('Time (days)')
-# axs[1].set_ylabel('Cumulative Expenses (€)')
-
-# plt.tight_layout()
+plt.plot(times_goal, savings_goal, label='Savings Over Time (Goal €500)')
+plt.axhline(500, color='red', linestyle='--', label='Goal €500')
+plt.title('Compound Poisson Process Until Goal Reached')
+plt.xlabel('Time')
+plt.ylabel('Savings (€)')
+plt.legend()
+plt.grid(True)
 
 
-# plt.show()
+plt.show()
