@@ -13,7 +13,7 @@ data = data.drop_duplicates()
 # data sorting
 data = data.sort_values(['Category', 'Date'])
 # data grouping
-data['Interarrival_Time'] = data.groupby('Category')['Date'].diff().dt.total_seconds()
+data['Interarrival_Time'] = data.groupby('Category')['Date'].diff().dt.total_seconds() / 86400
 #added columns for date/time/week/month
 data['Date_Day'] = data['Date'].dt.date
 data['Date_Time'] = data['Date'].dt.time
@@ -31,6 +31,36 @@ expense_amount_df = data[mask_expense]
 income_amount = income_amount_df['Amount']
 expense_amount = expense_amount_df['Amount']
 
+
+"""# Box plots
+# grouping categories with small number of measurements
+category_counts = expense_amount_df['Category'].value_counts()
+small_categories = category_counts[category_counts < 5].index
+expense_amount_df['Category_grouped'] = expense_amount_df['Category'].apply(lambda x: 'Other' if x in small_categories else x)
+
+plt.figure(figsize=(10, 6))
+sns.boxplot(y='Category_grouped', x='Amount', data=expense_amount_df)
+plt.xscale('log')
+plt.xlabel('Amount (log scale)')
+plt.title('Expenses by Category (Log Scale) with Small Groups Combined')
+plt.tight_layout()
+
+#box plot of 'other' income
+plt.figure()
+sns.boxplot(x=income_amount_df[income_amount_df['Category'] == 'Other']['Amount']
+)
+plt.title('Income Distribution of "Other" category')
+plt.xticks(rotation=45)
+plt.tight_layout()"""
+
+#remove income 'other' outliers
+income_amount_df = income_amount_df[~((income_amount_df['Category'] == 'Other') & (income_amount_df['Amount'] > 100))]
+
+#print(income_amount_df.groupby('Category')['Amount'].describe())
+#print(expense_amount_df.groupby('Category')['Amount'].describe())
+
+
+
 #
 #Creating pivot/heatmap df for income/expense
 #
@@ -43,6 +73,15 @@ expense_pivot_data = expense_amount_df.pivot_table(
 )
 #renaming index to week#No
 expense_pivot_data.index = [f"W{i+1}" for i in range(len(expense_pivot_data.index))]
+
+income_pivot_data = income_amount_df.pivot_table(
+    index='Week',
+    columns='Category',
+    values='Amount',
+    aggfunc='sum',
+    fill_value=0
+)
+income_pivot_data.index = [f"W{i+1}" for i in range(len(income_pivot_data.index))]
 
 expense_heatmap_data = expense_amount_df.pivot_table(
     index='Category',
@@ -64,41 +103,11 @@ income_heatmap_data = income_amount_df.pivot_table(
 income_heatmap_data.columns = [f"W{i+1}" for i in range(len(income_heatmap_data.columns))]
 
 
-income_pivot_data = income_amount_df.pivot_table(
-    index='Week',
-    columns='Category',
-    values='Amount',
-    aggfunc='sum',
-    fill_value=0
-)
-income_pivot_data.index = [f"W{i+1}" for i in range(len(income_pivot_data.index))]
-
-
 #sort expenses/income by sum and ascending
 expense_totals = expense_amount_df.groupby('Category')['Amount'].sum().sort_values(ascending=True)
 income_totals = income_amount_df.groupby('Category')['Amount'].sum().sort_values(ascending=True)
 
-print(income_amount_df.groupby('Category')['Amount'].describe())
-print(expense_amount_df.groupby('Category')['Amount'].describe())
 
-# Box plots
-# grouping categories with small number of measurements
-category_counts = expense_amount_df['Category'].value_counts()
-small_categories = category_counts[category_counts < 5].index
-expense_amount_df['Category_grouped'] = expense_amount_df['Category'].apply(lambda x: 'Other' if x in small_categories else x)
-
-plt.figure(figsize=(10, 6))
-sns.boxplot(y='Category_grouped', x='Amount', data=expense_amount_df)
-plt.xscale('log')
-plt.xlabel('Amount (log scale)')
-plt.title('Expenses by Category (Log Scale) with Small Groups Combined')
-plt.tight_layout()
-
-plt.figure()
-sns.boxplot(x=income_amount_df['Amount'])
-plt.title('Income Distribution by Category')
-plt.xticks(rotation=45)
-plt.tight_layout()
 
 # Weekly total income
 weekly_income = income_amount_df.groupby('Week')['Amount'].sum().reset_index()
@@ -160,9 +169,9 @@ avg_daily_expense_cat = daily_expense_cat.groupby(['Weekday', 'Category'])['Amou
 avg_daily_expense_pivot = avg_daily_expense_cat.pivot(index='Weekday', columns='Category', values='Amount')
 # Reorder by weekdays
 avg_daily_expense_pivot = avg_daily_expense_pivot.reindex(weekday_order)
+
 # Plot
 avg_daily_expense_pivot.plot(kind='bar', stacked=True, figsize=(10,6), colormap='tab20')
-
 plt.title('Average Daily Expense per Weekday by Category (Stacked)')
 plt.ylabel('Average Expense')
 plt.xlabel('Weekday')
@@ -186,7 +195,6 @@ for ax in (ax1, ax2):
     ax.set_ylabel(None)
     ax.set_xlabel("Week")
 fig.supylabel("Category")    
-
 plt.tight_layout()
 
 
@@ -215,6 +223,7 @@ plt.show()
 
 other_income_amount_df = income_amount_df[income_amount_df['Category'] == 'Other']['Amount']
 food_expense_amount_df = expense_amount_df[expense_amount_df['Category'] == 'Food']['Amount']
+household_expense_amount_df = expense_amount_df[expense_amount_df['Category'] == 'Household']['Amount']
 #HISTOGRAM OF OTHER INCOME
 plt.figure()
 plt.hist(other_income_amount_df, bins=30, density=True)
@@ -236,27 +245,152 @@ transport_expense_df = expense_amount_df[expense_amount_df['Category'] == 'Trans
 inter_days_transport = transport_expense_df['Interarrival_Time'].dropna()/86400
 
 #HISTOGRAM INTERARRIVAL TIMES FOOD EXPENSE
-plt.figure()
-sns.histplot(inter_days_food, bins=20, stat='density', color='skyblue')
-plt.xlabel('Interarrival time (seconds)')
-plt.ylabel('Density')
-plt.title('Interarrival Time Distribution – Food Expenses')
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+sns.histplot(inter_days_food, bins=20, stat='probability', color='skyblue', ax=ax1)
+sns.histplot(inter_days_transport, bins=20, stat='density', color='skyblue', ax=ax2)
+ax1.set_title("Interarrival Time Distribution – Food Expenses")
+ax1.set_xlabel("Interarrival time (days)")
+ax1.set_ylabel("Density")
 
-plt.figure()
-sns.histplot(inter_days_transport, bins=20, stat='density', color='skyblue')
-plt.xlabel('Interarrival time (seconds)')
-plt.ylabel('Density')
-plt.title('Interarrival Time Distribution – Food Expenses')
+ax2.set_title("Interarrival Time Distribution – Transport Expenses")
+ax2.set_xlabel("Interarrival time (days)")
+ax2.set_ylabel("Density")
+plt.tight_layout()
 plt.show()
 
 
-# INCOME AMOUNT DISTRIBUTIONS
-plt.figure()
-sns.histplot(income_amount, bins=30)
-plt.title('Income Amount Distribution') 
-plt.xlabel('Income Amount')              
-plt.ylabel('Frequency')                 
+# INCOME/EXPENSE INTERARRIVAL DISTRIBUTIONS
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+sns.histplot(income_amount['Interarrival_Time'], bins=30, ax=ax1)
+ax1.set_title("Income Amount Distribution")
+ax1.set_xlabel("Amount")
+ax1.set_ylabel("Frequency")
 
+sns.histplot(expense_amount['Interarrival_Time'], bins=30, ax=ax2)
+ax2.set_title("Expense Amount Distribution")
+ax2.set_xlabel("Amount")
+ax2.set_ylabel("Frequency")
+plt.show()
+
+
+
+income_M1 = np.mean(income_amount_df['Interarrival_Time'])
+income_M2 = np.mean(income_amount_df['Interarrival_Time']**2)
+
+income_mu = income_M1
+income_sigma2 = income_M2 - income_M1**2
+
+# fit an exponential distribution TO INTERARRIVAL
+lam = 1/income_M1
+fitExpDist = stats.expon(scale=1/lam)
+xs = np.arange(np.min(income_amount_df['Interarrival_Time']), np.max(income_amount_df['Interarrival_Time']), 0.1)
+ys = fitExpDist.pdf(xs)
+plt.figure()
+plt.hist(income_amount_df['Interarrival_Time'], bins=10, rwidth=0.8, density=True, alpha=0.6, label='Income Histogram')  # Added alpha and label
+plt.plot(xs, ys, color='red', lw=2, label='Exponential PDF')  # Added line width and label
+plt.title('Income Interarrival with Exponential Fit')  # Added title
+plt.xlabel('Income Interarrival')  # Added x-axis label
+plt.ylabel('Density')        # Added y-axis label
+plt.legend()                 # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
+
+# ecdf
+ecdfx = np.sort(income_amount_df['Interarrival_Time'])
+ecdfy = np.arange(1, len(income_amount_df['Interarrival_Time'])+1) / len(income_amount_df['Interarrival_Time'])
+plt.figure()
+plt.step(ecdfx, ecdfy, where='post', color='g', label='Empirical CDF')  # Added label
+plt.plot(xs, fitExpDist.cdf(xs), color='orange', lw=2, label='Exponential CDF')  # Added line width and label
+plt.title('Income Interarrival ECDF and Exponential CDF')  # Added title
+plt.xlabel('Income Interarrival Times')  # Added x-axis label
+plt.ylabel('CDF')            # Added y-axis label
+plt.legend()                 # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
+
+# fit a gamma distribution
+alpha = income_M1**2 / (income_M2 - income_M1**2)
+beta = income_M1 / (income_M2 - income_M1**2)
+fitGammaDist = stats.gamma(alpha, scale=1/beta)
+ys = fitGammaDist.pdf(xs)
+plt.plot(xs, fitGammaDist.cdf(xs), color='r', lw=2, label='Gamma CDF')  # Added line width and label
+plt.title('Income Interarrival ECDF and Gamma CDF')  # Added title (to existing figure)
+plt.xlabel('Income Interarrival Times')  # Added x-axis label
+plt.ylabel('CDF')            # Added y-axis label
+plt.legend()                 # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
+
+# fit a negative binaomial distribution
+p = income_mu / income_sigma2
+r = income_mu**2 / (income_sigma2 - income_mu)
+fitNBDist = stats.nbinom(n=r, p=p)
+xs = np.arange(0, income_amount_df['Interarrival_Time'].dropna().max()+5)
+plt.plot(xs, fitNBDist.cdf(xs), 'b--', label='NB CDF', lw=2)  # Added label and line width
+plt.title('Income Interarrival ECDF and Negative Binomial CDF')  # Added title
+plt.xlabel('Interarrival Times')  # Added x-axis label
+plt.ylabel('CDF')            # Added y-axis label
+plt.legend()                 # Added legend
+plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
+
+# Kolmogorov-Smirnov tests
+clean_data = income_amount_df['Interarrival_Time'].dropna()
+tst1 = stats.kstest(clean_data, fitExpDist.cdf)
+print('KS Test Exponential distribution: ' + str(tst1))
+tst2 = stats.kstest(clean_data, fitGammaDist.cdf)
+print('KS Test Gamma distribution: ' + str(tst2))
+tst3 = stats.kstest(clean_data, fitNBDist.cdf)
+print('KS Test Negative Binomial distribution:', tst3)
+
+
+clean_expense = expense_amount_df['Interarrival_Time'].dropna()
+
+# --- Moments ---
+M1 = np.mean(clean_expense)
+M2 = np.mean(clean_expense**2)
+mu = M1
+sigma2 = M2 - M1**2
+
+# --- Fit Exponential Distribution ---
+lam = 1 / M1
+fitExpDist = stats.expon(scale=1/lam)
+
+# --- Fit Gamma Distribution ---
+alpha = M1**2 / (M2 - M1**2)
+beta = M1 / (M2 - M1**2)
+fitGammaDist = stats.gamma(alpha, scale=1/beta)
+
+# --- Fit Negative Binomial Distribution ---
+p = mu / sigma2
+r = mu**2 / (sigma2 - mu)
+fitNBDist = stats.nbinom(n=r, p=p)
+
+# --- Create x-values for plotting ---
+xs = np.arange(0, clean_expense.max() + 5, 0.1)
+
+# --- Empirical CDF ---
+ecdfx = np.sort(clean_expense)
+ecdfy = np.arange(1, len(clean_expense) + 1) / len(clean_expense)
+
+# --- Plot ECDF with all fitted CDFs ---
+plt.figure(figsize=(8, 5))
+plt.step(ecdfx, ecdfy, where='post', color='g', label='Empirical CDF')
+plt.plot(xs, fitExpDist.cdf(xs), color='orange', lw=2, label='Exponential CDF')
+plt.plot(xs, fitGammaDist.cdf(xs), color='r', lw=2, label='Gamma CDF')
+plt.plot(xs, fitNBDist.cdf(xs), 'b--', lw=2, label='Negative Binomial CDF')
+plt.title('Income Interarrival ECDF with Theoretical CDFs')
+plt.xlabel('Interarrival Time (days)')
+plt.ylabel('CDF')
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.6)
+plt.tight_layout()
+plt.show()
+
+tst1 = stats.kstest(clean_expense, fitExpDist.cdf)
+print('KS Test Exponential distribution: ' + str(tst1))
+tst2 = stats.kstest(clean_expense, fitGammaDist.cdf)
+print('KS Test Gamma distribution: ' + str(tst2))
+tst3 = stats.kstest(clean_expense, fitNBDist.cdf)
+print('KS Test Negative Binomial distribution:', str(tst3))
+
+#income fitting
 income_M1 = np.mean(income_amount)
 income_M2 = np.mean(income_amount**2)
 
@@ -266,7 +400,7 @@ income_sigma2 = income_M2 - income_M1**2
 # fit an exponential distribution
 lam = 1/income_M1
 fitExpDist = stats.expon(scale=1/lam)
-xs = np.arange(np.min(income_amount), np.max(income_amount), 0.1)
+xs = np.arange(np.min(income_amount['Interarrival_Time']), np.max(income_amount), 0.1)
 ys = fitExpDist.pdf(xs)
 plt.figure()
 plt.hist(income_amount, bins=10, rwidth=0.8, density=True, alpha=0.6, label='Income Histogram')  # Added alpha and label
@@ -289,10 +423,6 @@ plt.ylabel('CDF')            # Added y-axis label
 plt.legend()                 # Added legend
 plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# Kolmogorov-Smirnov test
-tst1 = stats.kstest(income_amount, fitExpDist.cdf)
-print('KS Test Exponential distribution: ' + str(tst1))
-
 # fit a gamma distribution
 alpha = income_M1**2 / (income_M2 - income_M1**2)
 beta = income_M1 / (income_M2 - income_M1**2)
@@ -304,10 +434,6 @@ plt.xlabel('Income Amount')  # Added x-axis label
 plt.ylabel('CDF')            # Added y-axis label
 plt.legend()                 # Added legend
 plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
-
-# Kolmogorov-Smirnov test
-tst1 = stats.kstest(income_amount, fitGammaDist.cdf)
-print('KS Test Gamma distribution: ' + str(tst1))
 
 # fit a negative binaomial distribution
 p = income_mu / income_sigma2
@@ -321,18 +447,16 @@ plt.ylabel('CDF')            # Added y-axis label
 plt.legend()                 # Added legend
 plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# Kolmogorov-Smirnov test (use CDF directly)
-ks_result = stats.kstest(income_amount, fitNBDist.cdf)
-print('KS Test Negative Binomial distribution:', ks_result)
+# Kolmogorov-Smirnov tests
+tst1 = stats.kstest(income_amount, fitExpDist.cdf)
+print('KS Test Exponential distribution: ' + str(tst1))
+tst2 = stats.kstest(income_amount, fitGammaDist.cdf)
+print('KS Test Gamma distribution: ' + str(tst2))
+tst3 = stats.kstest(income_amount, fitNBDist.cdf)
+print('KS Test Negative Binomial distribution:', tst3)
 
 
-# EXPENSE AMOUNT DISTRIBUTIONS
-plt.figure()
-sns.histplot(expense_amount, bins=30)
-plt.title('Expense Amount Distribution') 
-plt.xlabel('Expense Amount')              
-plt.ylabel('Frequency')                   
-
+#Expense fitting
 
 expense_M1 = np.mean(expense_amount)
 expense_M2 = np.mean(expense_amount**2)
@@ -366,9 +490,6 @@ plt.ylabel('CDF')              # Added y-axis label
 plt.legend()                   # Added legend
 plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# Kolmogorov-Smirnov test
-tst1 = stats.kstest(expense_amount, fitExpDist.cdf)
-print('KS Test Exponential distribution: ' + str(tst1))
 
 # fit a gamma distribution
 alpha = expense_M1**2 / (expense_M2 - expense_M1**2)
@@ -382,9 +503,6 @@ plt.ylabel('CDF')              # Added y-axis label
 plt.legend()                   # Added legend
 plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
-# Kolmogorov-Smirnov test
-tst1 = stats.kstest(expense_amount, fitGammaDist.cdf)
-print('KS Test Gamma distribution: ' + str(tst1))
 
 # fit a negative binaomial distribution
 p = expense_mu / expense_sigma2
@@ -398,9 +516,17 @@ plt.ylabel('CDF')              # Added y-axis label
 plt.legend()                  # Added legend
 plt.grid(True, linestyle='--', alpha=0.6)  # Added grid
 
+
+# Kolmogorov-Smirnov test
+tst1 = stats.kstest(expense_amount, fitExpDist.cdf)
+print('KS Test Exponential distribution: ' + str(tst1))
+# Kolmogorov-Smirnov test
+tst2 = stats.kstest(expense_amount, fitGammaDist.cdf)
+print('KS Test Gamma distribution: ' + str(tst2))
 # Kolmogorov-Smirnov test (use CDF directly)
-ks_result = stats.kstest(expense_amount, fitNBDist.cdf)
-print('KS Test Negative Binomial distribution:', ks_result)
+tst3 = stats.kstest(expense_amount, fitNBDist.cdf)
+print('KS Test Negative Binomial distribution:', tst3)
+
 
 
 
